@@ -216,14 +216,14 @@ def noise_scale_func(signal_intensity):
 
 
 
-def generate_pair(duration, distance):
+def generate_pair(duration, distance, dtheta, dp):
     # ppp_intensity is inversely proportional to the distance
-    
+
     ppp_intensity = 0.05 * distance
-    # Un exemple de compil jit qui ralentit tout:
-    # _, event_times = simulate_neyman_scott_process_1d_jit(h=ppp_intensity, theta=10., p=3., duration=duration)
+    theta = 10. + dtheta
+    p = 3. + dp
     _, event_times = simulate_neyman_scott_process_1d(h=ppp_intensity, theta=10., p=3., duration=duration)
-    # t = time.time()
+
     times, smoothed_series = smooth_events_with_gaussian_window(event_times, duration=duration, sigma=2)
     ground_truth_specific = torch.tensor(smoothed_series, dtype=torch.float32)
     ground_truth = ground_truth_specific * 1/distance
@@ -256,13 +256,17 @@ class TensorPairDataset(Dataset):
         self.duration = duration
         self.idx2distance = idx2distance
         self.num_cmls = len(idx2distance)
+        self.indices = sorted(idx2distance.keys())
 
     def __len__(self):
         return self.num_cmls
 
-    def __getitem__(self, idx):
+    def __getitem__(self, i):
+        idx = self.indices[i]
         dist = self.idx2distance[idx]
-        ground_truth, noisy_series = generate_pair(self.duration, dist)
+        dtheta = idx/1000.
+        dp = 1 - idx/1000.
+        ground_truth, noisy_series = generate_pair(self.duration, dist, dtheta, dp)
 
         # normalisation:
         noisy_series = 0.3 * noisy_series
